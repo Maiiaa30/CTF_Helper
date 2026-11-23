@@ -1,11 +1,16 @@
 /* ============================================================
-   CTF Helper — application bootstrap
+   CTF Helper — application
    ============================================================ */
 (function () {
   "use strict";
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+  const ICONS = {
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+  };
 
   /* ---------- toast ---------- */
   let toastTimer;
@@ -17,19 +22,189 @@
     toastTimer = setTimeout(() => el.classList.remove("show"), 1600);
   }
 
+  /* ---------- helpers ---------- */
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      // fallback for non-secure contexts
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (_) {}
+      document.body.removeChild(ta);
+      return ok;
+    }
+  }
+
+  /* ---------- command block ---------- */
+  function cmdBlock(item) {
+    const el = document.createElement("div");
+    el.className = "cmd";
+    el.dataset.search = (item.cmd + " " + item.desc + " " + (item.tags || []).join(" ")).toLowerCase();
+
+    const tags = (item.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("");
+
+    el.innerHTML = `
+      ${item.desc ? `<div class="cmd-desc">${esc(item.desc)}</div>` : ""}
+      <div class="cmd-body">
+        <pre class="cmd-code">${esc(item.cmd)}</pre>
+        <div class="cmd-actions">
+          <button class="icon-btn copy-btn" title="Copy">${ICONS.copy}</button>
+        </div>
+      </div>
+      ${tags ? `<div class="cmd-tags">${tags}</div>` : ""}
+    `;
+
+    const copyBtn = $(".copy-btn", el);
+    copyBtn.addEventListener("click", async () => {
+      const ok = await copyText(item.cmd);
+      if (!ok) { toast("Copy failed", false); return; }
+      copyBtn.classList.add("copied");
+      copyBtn.innerHTML = ICONS.check;
+      toast("Copied to clipboard");
+      setTimeout(() => {
+        copyBtn.classList.remove("copied");
+        copyBtn.innerHTML = ICONS.copy;
+      }, 1100);
+    });
+
+    return el;
+  }
+
+  /* ---------- render one group ---------- */
+  function renderGroup(cat, group) {
+    const wrap = document.createElement("div");
+    wrap.className = "group";
+    wrap.dataset.group = group.id;
+
+    const head = document.createElement("button");
+    head.className = "group-head";
+    head.innerHTML = `
+      <span class="group-caret">▾</span>
+      <span>${esc(group.title)}</span>
+      <span class="group-count">${(group.items || []).length}</span>
+    `;
+    head.addEventListener("click", () => wrap.classList.toggle("collapsed"));
+    wrap.appendChild(head);
+
+    if (group.note) {
+      const note = document.createElement("div");
+      note.className = "group-note";
+      note.textContent = group.note;
+      wrap.appendChild(note);
+    }
+
+    const list = document.createElement("div");
+    list.className = "block-list";
+    (group.items || []).forEach((item) => list.appendChild(cmdBlock(item)));
+    wrap.appendChild(list);
+
+    return wrap;
+  }
+
+  /* ---------- render all sections ---------- */
+  function renderSections() {
+    const root = $("#sections");
+    root.innerHTML = "";
+
+    CTF_DATA.forEach((cat) => {
+      const sec = document.createElement("section");
+      sec.className = "cat-section";
+      sec.id = "cat-" + cat.id;
+      sec.dataset.cat = cat.id;
+
+      sec.innerHTML = `
+        <h2 class="cat-title"><span class="cat-emoji">${cat.emoji || ""}</span>${esc(cat.title)}</h2>
+        ${cat.desc ? `<p class="cat-desc">${esc(cat.desc)}</p>` : ""}
+      `;
+
+      (cat.groups || []).forEach((group) => sec.appendChild(renderGroup(cat, group)));
+      root.appendChild(sec);
+    });
+  }
+
+  /* ---------- sidebar ---------- */
+  function renderSidebar() {
+    const nav = $("#sidebar");
+    nav.innerHTML = "";
+
+    CTF_DATA.forEach((cat) => {
+      const catEl = document.createElement("div");
+      catEl.className = "nav-cat";
+
+      const head = document.createElement("button");
+      head.className = "nav-cat-head";
+      head.innerHTML = `
+        <span class="nav-cat-icon">${cat.emoji || "•"}</span>
+        <span>${esc(cat.title)}</span>
+        <span class="nav-cat-caret">▾</span>
+      `;
+      catEl.appendChild(head);
+
+      const links = document.createElement("div");
+      links.className = "nav-links";
+      (cat.groups || []).forEach((group) => {
+        const link = document.createElement("button");
+        link.className = "nav-link";
+        link.textContent = group.title;
+        link.dataset.target = "cat-" + cat.id;
+        link.dataset.group = group.id;
+        link.addEventListener("click", () => {
+          const sec = document.getElementById("cat-" + cat.id);
+          if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+          $("#sidebar").classList.remove("open");
+        });
+        links.appendChild(link);
+      });
+      catEl.appendChild(links);
+
+      head.addEventListener("click", () => catEl.classList.toggle("collapsed"));
+      nav.appendChild(catEl);
+    });
+  }
+
+  /* ---------- scroll spy ---------- */
+  function initScrollSpy() {
+    const sections = $$(".cat-section");
+    if (!("IntersectionObserver" in window) || !sections.length) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          const id = entry.target.id;
+          $$(".nav-link").forEach((l) => l.classList.toggle("active", l.dataset.target === id));
+        });
+      },
+      { rootMargin: "-20% 0px -70% 0px" }
+    );
+    sections.forEach((s) => obs.observe(s));
+  }
+
   /* ---------- target panel (visibility only; persistence added later) ---------- */
   function initTargetPanel() {
-    const toggle = $("#targetToggle");
-    const panel = $("#targetPanel");
-    toggle.addEventListener("click", () => {
+    $("#targetToggle").addEventListener("click", () => {
+      const panel = $("#targetPanel");
       panel.hidden = !panel.hidden;
     });
   }
 
-  /* ---------- expose a tiny shared namespace ---------- */
-  window.CTF = { $, $$, toast };
+  /* ---------- shared namespace ---------- */
+  window.CTF = { $, $$, toast, esc, copyText, ICONS };
 
   document.addEventListener("DOMContentLoaded", () => {
+    renderSidebar();
+    renderSections();
+    initScrollSpy();
     initTargetPanel();
   });
 })();
