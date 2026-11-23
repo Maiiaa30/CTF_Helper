@@ -68,7 +68,7 @@
     $$(".cat-section").forEach((s) => s.classList.toggle("inactive", s.dataset.cat !== catId));
     $$(".nav-cat").forEach((c) => c.classList.toggle("active-cat", c.dataset.cat === catId));
     if (!document.body.classList.contains("searching")) applyAccordion();
-    if (scrollTop) window.scrollTo({ top: 0, behavior: "smooth" });
+    if (scrollTop) $("#content").scrollTo({ top: 0, behavior: "smooth" });
   }
 
   /* ---------- helpers ---------- */
@@ -432,7 +432,7 @@
           $$(".nav-link").forEach((l) => l.classList.toggle("active", l.dataset.target === id));
         });
       },
-      { rootMargin: "-20% 0px -70% 0px" }
+      { root: $("#content"), rootMargin: "-10% 0px -70% 0px" }
     );
     sections.forEach((s) => obs.observe(s));
   }
@@ -565,8 +565,9 @@
   }
 
   function initChrome() {
-    window.addEventListener("scroll", () => {
-      document.body.classList.toggle("scrolled", window.scrollY > 4);
+    const content = $("#content");
+    content.addEventListener("scroll", () => {
+      document.body.classList.toggle("scrolled", content.scrollTop > 4);
     }, { passive: true });
   }
 

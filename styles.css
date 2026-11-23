@@ -44,6 +44,10 @@ html, body { height: 100%; }
 
 body {
   margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
@@ -80,9 +84,9 @@ body {
    Top bar
    ============================================================ */
 .topbar {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 40;
+  flex-shrink: 0;
   height: var(--topbar-h);
   display: flex;
   align-items: center;
@@ -211,9 +215,9 @@ body.scrolled .topbar { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
    Target panel
    ============================================================ */
 .target-panel {
-  position: sticky;
-  top: var(--topbar-h);
+  position: relative;
   z-index: 30;
+  flex-shrink: 0;
   background: var(--bg-1);
   border-bottom: 1px solid var(--border);
   padding: 16px 18px;
@@ -265,14 +269,17 @@ body.scrolled .topbar { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 /* ============================================================
    Layout
    ============================================================ */
-.layout { display: flex; align-items: flex-start; }
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
 
 .sidebar {
-  position: sticky;
-  top: var(--topbar-h);
   width: var(--sidebar-w);
   flex-shrink: 0;
-  height: calc(100vh - var(--topbar-h));
+  height: 100%;
   overflow-y: auto;
   padding: 16px 10px 40px;
   border-right: 1px solid var(--border);
@@ -337,8 +344,9 @@ body.scrolled .topbar { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 .content {
   flex: 1;
   min-width: 0;
+  height: 100%;
+  overflow-y: auto;
   padding: 26px 40px 120px;
-  max-width: 1720px;
 }
 
 /* ============================================================
@@ -722,6 +730,8 @@ mark.hl {
     position: fixed;
     left: 0;
     top: var(--topbar-h);
+    bottom: 0;
+    height: auto;
     z-index: 35;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
