@@ -534,19 +534,40 @@
     $("#searchClear").addEventListener("click", () => { clearSearch(); s.focus(); });
   }
 
+  function focusSearch() {
+    const s = $("#search");
+    s.focus();
+    s.select();
+  }
+
   function initKeyboard() {
     document.addEventListener("keydown", (e) => {
       const t = e.target;
       const tag = (t.tagName || "").toLowerCase();
       const typing = tag === "input" || tag === "textarea" || tag === "select" || t.isContentEditable;
-      if (e.key === "/" && !typing) {
+
+      if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        $("#search").focus();
+        focusSearch();
+      } else if (e.key === "/" && !typing) {
+        e.preventDefault();
+        focusSearch();
       } else if (e.key === "Escape" && t.id === "search") {
         clearSearch();
         t.blur();
       }
     });
+
+    if (/Mac|iPhone|iPad/.test(navigator.platform)) {
+      const hint = $("#searchHint");
+      if (hint) hint.textContent = "⌘K";
+    }
+  }
+
+  function initChrome() {
+    window.addEventListener("scroll", () => {
+      document.body.classList.toggle("scrolled", window.scrollY > 4);
+    }, { passive: true });
   }
 
   function initMobile() {
@@ -568,5 +589,6 @@
     initSearch();
     initKeyboard();
     initMobile();
+    initChrome();
   });
 })();

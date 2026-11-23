@@ -88,10 +88,10 @@ body {
   align-items: center;
   gap: 18px;
   padding: 0 18px;
-  background: rgba(13, 16, 22, 0.82);
-  backdrop-filter: blur(12px);
+  background: var(--bg-1);
   border-bottom: 1px solid var(--border);
 }
+body.scrolled .topbar { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 
 .brand {
   display: flex;
@@ -121,8 +121,8 @@ body {
 .search-input {
   width: 100%;
   height: 38px;
-  padding: 0 70px 0 14px;
-  background: var(--bg-1);
+  padding: 0 84px 0 14px;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
@@ -358,7 +358,13 @@ body.searching .cat-section.inactive { display: block; }
   letter-spacing: -0.2px;
 }
 .cat-title .cat-emoji { font-size: 19px; }
-.cat-desc { color: var(--text-dim); font-size: 13px; margin: 0 0 20px; }
+.cat-desc {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 0 0 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
 
 .group { margin-bottom: 22px; }
 .group-head {
@@ -413,30 +419,40 @@ body.searching .cat-section.inactive { display: block; }
     align-items: start;
   }
 }
-@media (min-width: 1700px) {
+@media (min-width: 1920px) {
   .block-list:not(.no-grid) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 .cmd {
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.cmd:hover { border-color: var(--border-2); }
+.cmd:hover {
+  border-color: var(--border-2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
 
 .cmd-desc {
-  padding: 10px 14px 0;
+  padding: 11px 14px 9px;
   color: var(--text-dim);
   font-size: 12.5px;
+  line-height: 1.45;
 }
 .cmd-body {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 8px 10px 10px 14px;
+  flex: 1;
+  padding: 11px 10px 11px 14px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
 }
+.cmd > .cmd-body:first-child { border-top: none; }
 .cmd-code {
   flex: 1;
   margin: 0;
@@ -445,9 +461,11 @@ body.searching .cat-section.inactive { display: block; }
   line-height: 1.6;
   color: var(--text);
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   overflow-x: auto;
-  padding-top: 4px;
+  padding-top: 2px;
+  tab-size: 2;
 }
 .cmd-code .tok { color: var(--cyan); }
 .cmd-code .var { color: var(--amber); }
@@ -477,7 +495,7 @@ body.searching .cat-section.inactive { display: block; }
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  padding: 0 14px 11px;
+  padding: 9px 14px 11px;
 }
 .tag {
   font-family: var(--mono);
@@ -518,7 +536,7 @@ body.searching .cat-section.inactive { display: block; }
   border-radius: 20px;
   margin: 11px 0 0 14px;
 }
-.shell-name + .cmd-body { padding-top: 6px; }
+.shell-name + .cmd-body { border-top: none; padding-top: 4px; }
 
 /* ============================================================
    Reference rows (term / description)
