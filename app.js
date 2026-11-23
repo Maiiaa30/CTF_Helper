@@ -54,6 +54,23 @@
     $$(".group").forEach((g) => g.classList.toggle("collapsed", ids.indexOf(g.dataset.group) !== -1));
   }
 
+  /* ---------- category tabs ---------- */
+  let activeCat = null;
+
+  function applyAccordion() {
+    $$(".nav-cat").forEach((c) => c.classList.toggle("collapsed", c.dataset.cat !== activeCat));
+  }
+
+  function setActive(catId, scrollTop = true) {
+    if (!CTF_DATA.some((c) => c.id === catId)) catId = CTF_DATA[0].id;
+    activeCat = catId;
+    STORE.set("ctf.activeCat", catId);
+    $$(".cat-section").forEach((s) => s.classList.toggle("inactive", s.dataset.cat !== catId));
+    $$(".nav-cat").forEach((c) => c.classList.toggle("active-cat", c.dataset.cat === catId));
+    if (!document.body.classList.contains("searching")) applyAccordion();
+    if (scrollTop) window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   /* ---------- helpers ---------- */
   function esc(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -198,7 +215,7 @@
     listenHead.textContent = "Listener";
     wrap.appendChild(listenHead);
     const listenList = document.createElement("div");
-    listenList.className = "block-list";
+    listenList.className = "block-list no-grid";
     wrap.appendChild(listenList);
 
     const shellHead = document.createElement("div");
@@ -206,7 +223,7 @@
     shellHead.textContent = "Payloads";
     wrap.appendChild(shellHead);
     const shellList = document.createElement("div");
-    shellList.className = "block-list";
+    shellList.className = "block-list no-grid";
     wrap.appendChild(shellList);
 
     const lhostIn = $("#revLhost", controls);
@@ -363,13 +380,10 @@
     const nav = $("#sidebar");
     nav.innerHTML = "";
 
-    const navCollapsed = STORE.get("ctf.navCollapsed", []);
-
     CTF_DATA.forEach((cat) => {
       const catEl = document.createElement("div");
       catEl.className = "nav-cat";
       catEl.dataset.cat = cat.id;
-      if (navCollapsed.indexOf(cat.id) !== -1) catEl.classList.add("collapsed");
 
       const head = document.createElement("button");
       head.className = "nav-cat-head";
@@ -389,8 +403,9 @@
         link.dataset.target = "cat-" + cat.id;
         link.dataset.group = group.id;
         link.addEventListener("click", () => {
-          const sec = document.getElementById("cat-" + cat.id);
-          if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+          if (activeCat !== cat.id) setActive(cat.id, false);
+          const grp = document.querySelector('#cat-' + cat.id + ' .group[data-group="' + group.id + '"]');
+          if (grp) grp.scrollIntoView({ behavior: "smooth", block: "start" });
           $("#sidebar").classList.remove("open");
         });
         links.appendChild(link);
@@ -398,8 +413,8 @@
       catEl.appendChild(links);
 
       head.addEventListener("click", () => {
-        catEl.classList.toggle("collapsed");
-        STORE.set("ctf.navCollapsed", $$(".nav-cat.collapsed").map((c) => c.dataset.cat));
+        setActive(cat.id);
+        $("#sidebar").classList.remove("open");
       });
       nav.appendChild(catEl);
     });
@@ -469,9 +484,14 @@
     const searching = tokens.length > 0;
     document.body.classList.toggle("searching", searching);
 
-    // expand all groups while searching so matches are visible
-    if (searching) $$("#sections .group").forEach((g) => g.classList.remove("collapsed"));
-    else applyCollapsed();
+    // expand all groups + nav while searching so matches are visible across tabs
+    if (searching) {
+      $$("#sections .group").forEach((g) => g.classList.remove("collapsed"));
+      $$(".nav-cat").forEach((c) => c.classList.remove("collapsed"));
+    } else {
+      applyCollapsed();
+      applyAccordion();
+    }
 
     $$("#sections [data-search]").forEach((el) => {
       const match = !searching || tokens.every((t) => el.dataset.search.indexOf(t) !== -1);
@@ -542,6 +562,7 @@
     renderSections();
     applyCollapsed();
     renderQuickAccess();
+    setActive(STORE.get("ctf.activeCat", CTF_DATA[0].id), false);
     initScrollSpy();
     initTargetPanel();
     initSearch();

@@ -329,18 +329,25 @@ body {
   border-left-color: var(--accent);
   background: var(--accent-faint);
 }
+.nav-cat.active-cat > .nav-cat-head {
+  color: var(--accent-soft);
+  background: var(--accent-faint);
+}
 
 .content {
   flex: 1;
   min-width: 0;
-  padding: 24px 30px 120px;
-  max-width: 1100px;
+  padding: 26px 40px 120px;
+  max-width: 1720px;
 }
 
 /* ============================================================
    Sections & groups
    ============================================================ */
 .cat-section { margin-bottom: 44px; scroll-margin-top: 76px; }
+/* tab behaviour: one category visible at a time (search overrides) */
+.cat-section.inactive { display: none; }
+body.searching .cat-section.inactive { display: block; }
 .cat-title {
   display: flex;
   align-items: center;
@@ -396,6 +403,19 @@ body {
    Command blocks
    ============================================================ */
 .block-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* wide screens: two-column command grid to use horizontal space */
+@media (min-width: 1180px) {
+  .block-list:not(.no-grid) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+}
+@media (min-width: 1700px) {
+  .block-list:not(.no-grid) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 
 .cmd {
   background: var(--surface);
