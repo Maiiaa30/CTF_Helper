@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A fast, searchable command and reference hub for CTF challenges and penetration testing." />
+  <title>CTF Helper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">&gt;_</span>
+      <span class="brand-name">CTF Helper</span>
+    </div>
+
+    <div class="search-wrap">
+      <input
+        id="search"
+        type="text"
+        class="search-input"
+        placeholder="Search commands, descriptions, tags…"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Search" />
+      <kbd class="search-hint">/</kbd>
+      <button id="searchClear" class="search-clear" title="Clear search" aria-label="Clear search">&times;</button>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="targetToggle" class="btn btn-ghost" title="Toggle active target panel">
+        <span class="status-dot" id="targetDot"></span>
+        <span>Active Target</span>
+      </button>
+    </div>
+  </header>
+
+  <section id="targetPanel" class="target-panel" hidden>
+    <div class="target-grid">
+      <label class="field">
+        <span class="field-label">Target IP / Host</span>
+        <input id="tgtHost" type="text" class="field-input mono" placeholder="10.10.10.10 / box.htb" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span class="field-label">Open Ports</span>
+        <input id="tgtPorts" type="text" class="field-input mono" placeholder="22, 80, 445, 3389" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span class="field-label">Phase</span>
+        <select id="tgtPhase" class="field-input">
+          <option value="recon">Recon</option>
+          <option value="web">Web</option>
+          <option value="privesc">Privesc</option>
+          <option value="ad">Active Directory</option>
+          <option value="post">Post-Exploit</option>
+        </select>
+      </label>
+      <label class="field field-wide">
+        <span class="field-label">Notes</span>
+        <textarea id="tgtNotes" class="field-input mono" rows="3" placeholder="Credentials, hashes, foothold path, loot…"></textarea>
+      </label>
+    </div>
+    <div class="target-footer">
+      <span id="targetSaved" class="target-saved">Saved locally</span>
+      <button id="targetClear" class="btn btn-danger-ghost">Clear target</button>
+    </div>
+  </section>
+
+  <div class="layout">
+    <nav id="sidebar" class="sidebar" aria-label="Categories"></nav>
+
+    <main id="content" class="content">
+      <section id="quickAccess" class="quick-access" hidden>
+        <div class="quick-access-head">
+          <h2>Quick Access</h2>
+          <span class="muted">Pinned commands</span>
+        </div>
+        <div id="pinnedList" class="block-list"></div>
+      </section>
+
+      <div id="sections" class="sections"></div>
+
+      <div id="noResults" class="no-results" hidden>
+        <p>No matches. Try a different keyword.</p>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
