@@ -22,6 +22,13 @@
     toastTimer = setTimeout(() => el.classList.remove("show"), 1600);
   }
 
+  /* ---------- storage ---------- */
+  const STORE = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  };
+
   /* ---------- helpers ---------- */
   function esc(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -46,6 +53,20 @@
     }
   }
 
+  /* ---------- copy button wiring (text can be static or a getter) ---------- */
+  function attachCopy(btn, getText) {
+    btn.addEventListener("click", async () => {
+      const text = typeof getText === "function" ? getText() : getText;
+      const ok = await copyText(text);
+      if (!ok) { toast("Copy failed", false); return; }
+      btn.classList.add("copied");
+      const prev = btn.innerHTML;
+      btn.innerHTML = ICONS.check;
+      toast("Copied to clipboard");
+      setTimeout(() => { btn.classList.remove("copied"); btn.innerHTML = prev; }, 1100);
+    });
+  }
+
   /* ---------- command block ---------- */
   function cmdBlock(item) {
     const el = document.createElement("div");
@@ -65,24 +86,106 @@
       ${tags ? `<div class="cmd-tags">${tags}</div>` : ""}
     `;
 
-    const copyBtn = $(".copy-btn", el);
-    copyBtn.addEventListener("click", async () => {
-      const ok = await copyText(item.cmd);
-      if (!ok) { toast("Copy failed", false); return; }
-      copyBtn.classList.add("copied");
-      copyBtn.innerHTML = ICONS.check;
-      toast("Copied to clipboard");
-      setTimeout(() => {
-        copyBtn.classList.remove("copied");
-        copyBtn.innerHTML = ICONS.copy;
-      }, 1100);
-    });
-
+    attachCopy($(".copy-btn", el), item.cmd);
     return el;
+  }
+
+  /* ---------- reverse shell generator ---------- */
+  function substitute(tpl, lhost, lport) {
+    return tpl.replace(/\{\{LHOST\}\}/g, lhost || "LHOST").replace(/\{\{LPORT\}\}/g, lport || "LPORT");
+  }
+
+  function revBlock(name, cmd) {
+    const el = document.createElement("div");
+    el.className = "cmd";
+    el.dataset.search = (name + " " + cmd).toLowerCase();
+    el.innerHTML = `
+      <span class="shell-name">${esc(name)}</span>
+      <div class="cmd-body">
+        <pre class="cmd-code">${esc(cmd)}</pre>
+        <div class="cmd-actions"><button class="icon-btn copy-btn" title="Copy">${ICONS.copy}</button></div>
+      </div>`;
+    attachCopy($(".copy-btn", el), cmd);
+    return el;
+  }
+
+  function renderRevshell(group) {
+    const wrap = document.createElement("div");
+    wrap.className = "group";
+    wrap.dataset.group = group.id;
+
+    const head = document.createElement("button");
+    head.className = "group-head";
+    head.innerHTML = `<span class="group-caret">▾</span><span>${esc(group.title)}</span><span class="group-count">${REVSHELLS.length}</span>`;
+    head.addEventListener("click", () => wrap.classList.toggle("collapsed"));
+    wrap.appendChild(head);
+
+    if (group.note) {
+      const note = document.createElement("div");
+      note.className = "group-note";
+      note.textContent = group.note;
+      wrap.appendChild(note);
+    }
+
+    const saved = STORE.get("ctf.rev", { lhost: "", lport: "" });
+    const controls = document.createElement("div");
+    controls.className = "rev-controls";
+    controls.innerHTML = `
+      <label class="field">
+        <span class="field-label">LHOST</span>
+        <input id="revLhost" class="field-input mono" placeholder="10.10.14.1" autocomplete="off" value="${esc(saved.lhost || "")}">
+      </label>
+      <label class="field">
+        <span class="field-label">LPORT</span>
+        <input id="revLport" class="field-input mono" placeholder="4444" autocomplete="off" value="${esc(saved.lport || "")}">
+      </label>`;
+    wrap.appendChild(controls);
+
+    const listenHead = document.createElement("div");
+    listenHead.className = "rev-subhead";
+    listenHead.textContent = "Listener";
+    wrap.appendChild(listenHead);
+    const listenList = document.createElement("div");
+    listenList.className = "block-list";
+    wrap.appendChild(listenList);
+
+    const shellHead = document.createElement("div");
+    shellHead.className = "rev-subhead";
+    shellHead.textContent = "Payloads";
+    wrap.appendChild(shellHead);
+    const shellList = document.createElement("div");
+    shellList.className = "block-list";
+    wrap.appendChild(shellList);
+
+    const lhostIn = $("#revLhost", controls);
+    const lportIn = $("#revLport", controls);
+
+    function build() {
+      const lhost = lhostIn.value.trim();
+      const lport = lportIn.value.trim();
+      listenList.innerHTML = "";
+      LISTENERS.forEach((l) => listenList.appendChild(revBlock(l.name, substitute(l.cmd, lhost, lport))));
+      shellList.innerHTML = "";
+      REVSHELLS.forEach((s) => shellList.appendChild(revBlock(s.name, substitute(s.cmd, lhost, lport))));
+    }
+
+    let t;
+    function onInput() {
+      STORE.set("ctf.rev", { lhost: lhostIn.value.trim(), lport: lportIn.value.trim() });
+      clearTimeout(t);
+      t = setTimeout(build, 60);
+    }
+    lhostIn.addEventListener("input", onInput);
+    lportIn.addEventListener("input", onInput);
+    build();
+
+    return wrap;
   }
 
   /* ---------- render one group ---------- */
   function renderGroup(cat, group) {
+    if (group.type === "revshell") return renderRevshell(group);
+
     const wrap = document.createElement("div");
     wrap.className = "group";
     wrap.dataset.group = group.id;
@@ -190,11 +293,44 @@
     sections.forEach((s) => obs.observe(s));
   }
 
-  /* ---------- target panel (visibility only; persistence added later) ---------- */
+  /* ---------- target panel (persisted) ---------- */
   function initTargetPanel() {
+    const panel = $("#targetPanel");
+    const dot = $("#targetDot");
+    const savedMsg = $("#targetSaved");
+    const fields = { host: $("#tgtHost"), ports: $("#tgtPorts"), phase: $("#tgtPhase"), notes: $("#tgtNotes") };
+
+    const data = STORE.get("ctf.target", {});
+    Object.keys(fields).forEach((k) => { if (data[k] != null) fields[k].value = data[k]; });
+
+    function refreshDot() { dot.classList.toggle("active", !!fields.host.value.trim()); }
+    refreshDot();
+
+    // remember panel open state
+    if (STORE.get("ctf.targetOpen", false)) panel.hidden = false;
+
+    let savedTimer;
+    function save() {
+      const out = {};
+      Object.keys(fields).forEach((k) => { out[k] = fields[k].value; });
+      STORE.set("ctf.target", out);
+      refreshDot();
+      savedMsg.classList.add("show");
+      clearTimeout(savedTimer);
+      savedTimer = setTimeout(() => savedMsg.classList.remove("show"), 1200);
+    }
+    Object.values(fields).forEach((el) => el.addEventListener("input", save));
+
     $("#targetToggle").addEventListener("click", () => {
-      const panel = $("#targetPanel");
       panel.hidden = !panel.hidden;
+      STORE.set("ctf.targetOpen", !panel.hidden);
+    });
+
+    $("#targetClear").addEventListener("click", () => {
+      Object.values(fields).forEach((el) => { el.value = el.tagName === "SELECT" ? el.options[0].value : ""; });
+      STORE.del("ctf.target");
+      refreshDot();
+      toast("Target cleared");
     });
   }
 

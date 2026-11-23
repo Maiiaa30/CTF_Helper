@@ -458,6 +458,37 @@ body {
 }
 
 /* ============================================================
+   Reverse shell generator
+   ============================================================ */
+.rev-controls {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.rev-controls .field { min-width: 180px; flex: 1; max-width: 280px; }
+.rev-subhead {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-mute);
+  font-weight: 600;
+  margin: 18px 0 10px;
+}
+.shell-name {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent-soft);
+  background: var(--accent-faint);
+  border: 1px solid var(--accent-line);
+  padding: 2px 9px;
+  border-radius: 20px;
+  margin: 11px 0 0 14px;
+}
+.shell-name + .cmd-body { padding-top: 6px; }
+
+/* ============================================================
    Quick access
    ============================================================ */
 .quick-access {

