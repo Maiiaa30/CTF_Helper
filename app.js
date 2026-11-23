@@ -183,20 +183,15 @@
   }
 
   /* ---------- render one group ---------- */
-  function renderGroup(cat, group) {
-    if (group.type === "revshell") return renderRevshell(group);
-
+  /* shared group shell: wrap + collapsible head + optional note */
+  function groupShell(group, count) {
     const wrap = document.createElement("div");
     wrap.className = "group";
     wrap.dataset.group = group.id;
 
     const head = document.createElement("button");
     head.className = "group-head";
-    head.innerHTML = `
-      <span class="group-caret">▾</span>
-      <span>${esc(group.title)}</span>
-      <span class="group-count">${(group.items || []).length}</span>
-    `;
+    head.innerHTML = `<span class="group-caret">▾</span><span>${esc(group.title)}</span><span class="group-count">${count}</span>`;
     head.addEventListener("click", () => wrap.classList.toggle("collapsed"));
     wrap.appendChild(head);
 
@@ -206,12 +201,87 @@
       note.textContent = group.note;
       wrap.appendChild(note);
     }
+    return wrap;
+  }
 
+  function refList(items) {
     const list = document.createElement("div");
-    list.className = "block-list";
-    (group.items || []).forEach((item) => list.appendChild(cmdBlock(item)));
-    wrap.appendChild(list);
+    list.className = "ref-list";
+    items.forEach((it) => {
+      const row = document.createElement("div");
+      row.className = "ref-row";
+      row.dataset.search = (it.term + " " + it.desc).toLowerCase();
+      row.innerHTML = `<span class="ref-term mono">${esc(it.term)}</span><span class="ref-desc">${esc(it.desc)}</span>`;
+      list.appendChild(row);
+    });
+    return list;
+  }
 
+  function checklist(items) {
+    const list = document.createElement("div");
+    list.className = "check-list";
+    items.forEach((text) => {
+      const row = document.createElement("button");
+      row.className = "check-row";
+      row.type = "button";
+      row.dataset.search = String(text).toLowerCase();
+      row.innerHTML = `<span class="check-box"></span><span class="check-text">${esc(text)}</span>`;
+      row.addEventListener("click", () => row.classList.toggle("done"));
+      list.appendChild(row);
+    });
+    return list;
+  }
+
+  function dataTable(group) {
+    const wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    const cols = group.columns || [];
+    const head = cols.map((c) => `<th>${esc(c)}</th>`).join("");
+    const body = (group.rows || [])
+      .map((r) => `<tr data-search="${esc(r.join(" ").toLowerCase())}">` + r.map((c) => `<td>${esc(c)}</td>`).join("") + "</tr>")
+      .join("");
+    wrap.innerHTML = `<table class="ref-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    return wrap;
+  }
+
+  function linkList(items) {
+    const list = document.createElement("div");
+    list.className = "link-list";
+    items.forEach((it) => {
+      const a = document.createElement("a");
+      a.className = "link-card";
+      a.href = it.url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.dataset.search = (it.label + " " + (it.note || "") + " " + it.url).toLowerCase();
+      a.innerHTML = `
+        <span class="link-label">${esc(it.label)} <span class="link-ext">↗</span></span>
+        ${it.note ? `<span class="link-note">${esc(it.note)}</span>` : ""}`;
+      list.appendChild(a);
+    });
+    return list;
+  }
+
+  function renderGroup(cat, group) {
+    if (group.type === "revshell") return renderRevshell(group);
+
+    const n = group.type === "table" ? (group.rows || []).length : (group.items || []).length;
+    const wrap = groupShell(group, n);
+
+    if (group.type === "ref") {
+      wrap.appendChild(refList(group.items || []));
+    } else if (group.type === "checklist") {
+      wrap.appendChild(checklist(group.items || []));
+    } else if (group.type === "table") {
+      wrap.appendChild(dataTable(group));
+    } else if (group.type === "links") {
+      wrap.appendChild(linkList(group.items || []));
+    } else {
+      const list = document.createElement("div");
+      list.className = "block-list";
+      (group.items || []).forEach((item) => list.appendChild(cmdBlock(item)));
+      wrap.appendChild(list);
+    }
     return wrap;
   }
 
