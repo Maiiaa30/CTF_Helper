@@ -55,6 +55,18 @@ body {
 
 .mono { font-family: var(--mono); }
 .muted { color: var(--text-mute); font-size: 12px; }
+.hidden { display: none !important; }
+
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
 
 ::selection { background: var(--accent-faint); }
 
@@ -680,6 +692,7 @@ mark.hl {
   .sidebar.open { transform: none; }
   .content { padding: 20px 16px 100px; }
   .brand-name { display: none; }
+  .menu-toggle { display: block; }
 }
 @media (max-width: 560px) {
   .target-grid { grid-template-columns: 1fr; }

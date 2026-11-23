@@ -9,7 +9,9 @@
 
   const ICONS = {
     copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
-    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+    pinFilled: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
   };
 
   /* ---------- toast ---------- */
@@ -28,6 +30,29 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
     del(k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
+
+  /* ---------- pins ---------- */
+  let pins = STORE.get("ctf.pins", []);
+  const itemIndex = new Map(); // cmd -> item
+
+  function isPinned(cmd) { return pins.indexOf(cmd) !== -1; }
+  function togglePin(cmd) {
+    const i = pins.indexOf(cmd);
+    if (i === -1) { pins.push(cmd); toast("Pinned to Quick Access"); }
+    else { pins.splice(i, 1); toast("Unpinned"); }
+    STORE.set("ctf.pins", pins);
+    refreshPins();
+  }
+
+  /* ---------- collapse persistence ---------- */
+  function saveCollapsed() {
+    const ids = $$(".group.collapsed").map((g) => g.dataset.group);
+    STORE.set("ctf.collapsed", ids);
+  }
+  function applyCollapsed() {
+    const ids = STORE.get("ctf.collapsed", []);
+    $$(".group").forEach((g) => g.classList.toggle("collapsed", ids.indexOf(g.dataset.group) !== -1));
+  }
 
   /* ---------- helpers ---------- */
   function esc(s) {
@@ -69,17 +94,22 @@
 
   /* ---------- command block ---------- */
   function cmdBlock(item) {
+    itemIndex.set(item.cmd, item);
+
     const el = document.createElement("div");
     el.className = "cmd";
+    el.dataset.cmd = item.cmd;
     el.dataset.search = (item.cmd + " " + item.desc + " " + (item.tags || []).join(" ")).toLowerCase();
 
     const tags = (item.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("");
+    const pinned = isPinned(item.cmd);
 
     el.innerHTML = `
       ${item.desc ? `<div class="cmd-desc">${esc(item.desc)}</div>` : ""}
       <div class="cmd-body">
         <pre class="cmd-code">${esc(item.cmd)}</pre>
         <div class="cmd-actions">
+          <button class="icon-btn pin-btn ${pinned ? "pinned" : ""}" title="Pin to Quick Access">${pinned ? ICONS.pinFilled : ICONS.pin}</button>
           <button class="icon-btn copy-btn" title="Copy">${ICONS.copy}</button>
         </div>
       </div>
@@ -87,7 +117,29 @@
     `;
 
     attachCopy($(".copy-btn", el), item.cmd);
+    $(".pin-btn", el).addEventListener("click", () => togglePin(item.cmd));
     return el;
+  }
+
+  /* ---------- quick access (pinned) ---------- */
+  function renderQuickAccess() {
+    const section = $("#quickAccess");
+    const list = $("#pinnedList");
+    list.innerHTML = "";
+    const valid = pins.filter((c) => itemIndex.has(c));
+    if (!valid.length) { section.hidden = true; return; }
+    section.hidden = false;
+    valid.forEach((c) => list.appendChild(cmdBlock(itemIndex.get(c))));
+  }
+
+  function refreshPins() {
+    $$(".pin-btn").forEach((btn) => {
+      const cmd = btn.closest(".cmd").dataset.cmd;
+      const on = isPinned(cmd);
+      btn.classList.toggle("pinned", on);
+      btn.innerHTML = on ? ICONS.pinFilled : ICONS.pin;
+    });
+    renderQuickAccess();
   }
 
   /* ---------- reverse shell generator ---------- */
@@ -117,7 +169,7 @@
     const head = document.createElement("button");
     head.className = "group-head";
     head.innerHTML = `<span class="group-caret">▾</span><span>${esc(group.title)}</span><span class="group-count">${REVSHELLS.length}</span>`;
-    head.addEventListener("click", () => wrap.classList.toggle("collapsed"));
+    head.addEventListener("click", () => { wrap.classList.toggle("collapsed"); saveCollapsed(); });
     wrap.appendChild(head);
 
     if (group.note) {
@@ -192,7 +244,7 @@
     const head = document.createElement("button");
     head.className = "group-head";
     head.innerHTML = `<span class="group-caret">▾</span><span>${esc(group.title)}</span><span class="group-count">${count}</span>`;
-    head.addEventListener("click", () => wrap.classList.toggle("collapsed"));
+    head.addEventListener("click", () => { wrap.classList.toggle("collapsed"); saveCollapsed(); });
     wrap.appendChild(head);
 
     if (group.note) {
@@ -311,9 +363,13 @@
     const nav = $("#sidebar");
     nav.innerHTML = "";
 
+    const navCollapsed = STORE.get("ctf.navCollapsed", []);
+
     CTF_DATA.forEach((cat) => {
       const catEl = document.createElement("div");
       catEl.className = "nav-cat";
+      catEl.dataset.cat = cat.id;
+      if (navCollapsed.indexOf(cat.id) !== -1) catEl.classList.add("collapsed");
 
       const head = document.createElement("button");
       head.className = "nav-cat-head";
@@ -341,7 +397,10 @@
       });
       catEl.appendChild(links);
 
-      head.addEventListener("click", () => catEl.classList.toggle("collapsed"));
+      head.addEventListener("click", () => {
+        catEl.classList.toggle("collapsed");
+        STORE.set("ctf.navCollapsed", $$(".nav-cat.collapsed").map((c) => c.dataset.cat));
+      });
       nav.appendChild(catEl);
     });
   }
@@ -404,13 +463,89 @@
     });
   }
 
+  /* ---------- search / filter ---------- */
+  function runSearch(q) {
+    const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const searching = tokens.length > 0;
+    document.body.classList.toggle("searching", searching);
+
+    // expand all groups while searching so matches are visible
+    if (searching) $$("#sections .group").forEach((g) => g.classList.remove("collapsed"));
+    else applyCollapsed();
+
+    $$("#sections [data-search]").forEach((el) => {
+      const match = !searching || tokens.every((t) => el.dataset.search.indexOf(t) !== -1);
+      el.classList.toggle("hidden", !match);
+    });
+
+    $$("#sections .group").forEach((g) => {
+      g.classList.toggle("hidden", searching && !g.querySelector("[data-search]:not(.hidden)"));
+    });
+
+    let any = false;
+    $$(".cat-section").forEach((s) => {
+      const has = s.querySelector(".group:not(.hidden)");
+      s.classList.toggle("hidden", searching && !has);
+      if (has) any = true;
+    });
+
+    $$(".nav-link").forEach((l) => {
+      const sec = document.getElementById(l.dataset.target);
+      const grp = sec && sec.querySelector('.group[data-group="' + l.dataset.group + '"]');
+      const vis = grp && !grp.classList.contains("hidden");
+      l.classList.toggle("hidden", searching && !vis);
+    });
+    $$(".nav-cat").forEach((c) => {
+      c.classList.toggle("hidden", searching && !c.querySelector(".nav-link:not(.hidden)"));
+    });
+
+    $("#noResults").hidden = !(searching && !any);
+  }
+
+  function clearSearch() {
+    const s = $("#search");
+    s.value = "";
+    runSearch("");
+  }
+
+  function initSearch() {
+    const s = $("#search");
+    s.addEventListener("input", () => runSearch(s.value));
+    $("#searchClear").addEventListener("click", () => { clearSearch(); s.focus(); });
+  }
+
+  function initKeyboard() {
+    document.addEventListener("keydown", (e) => {
+      const t = e.target;
+      const tag = (t.tagName || "").toLowerCase();
+      const typing = tag === "input" || tag === "textarea" || tag === "select" || t.isContentEditable;
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        $("#search").focus();
+      } else if (e.key === "Escape" && t.id === "search") {
+        clearSearch();
+        t.blur();
+      }
+    });
+  }
+
+  function initMobile() {
+    const btn = $("#menuToggle");
+    if (btn) btn.addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+  }
+
   /* ---------- shared namespace ---------- */
   window.CTF = { $, $$, toast, esc, copyText, ICONS };
 
   document.addEventListener("DOMContentLoaded", () => {
     renderSidebar();
     renderSections();
+    applyCollapsed();
+    renderQuickAccess();
     initScrollSpy();
     initTargetPanel();
+    initSearch();
+    initKeyboard();
+    initMobile();
   });
 })();
