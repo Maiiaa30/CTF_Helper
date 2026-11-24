@@ -116,7 +116,7 @@
     const el = document.createElement("div");
     el.className = "cmd";
     el.dataset.cmd = item.cmd;
-    el.dataset.search = (item.cmd + " " + item.desc + " " + (item.tags || []).join(" ")).toLowerCase();
+    el.dataset.search = (item.cmd + " " + item.desc + " " + (item.hint || "") + " " + (item.tags || []).join(" ")).toLowerCase();
 
     const tags = (item.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("");
     const pinned = isPinned(item.cmd);
@@ -130,6 +130,7 @@
           <button class="icon-btn copy-btn" title="Copy">${ICONS.copy}</button>
         </div>
       </div>
+      ${item.hint ? `<div class="cmd-hint">${esc(item.hint)}</div>` : ""}
       ${tags ? `<div class="cmd-tags">${tags}</div>` : ""}
     `;
 
@@ -573,7 +574,24 @@
 
   function initMobile() {
     const btn = $("#menuToggle");
-    if (btn) btn.addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+    const sidebar = $("#sidebar");
+    if (!btn || !sidebar) return;
+
+    const overlay = document.createElement("div");
+    overlay.className = "sidebar-overlay";
+    document.body.appendChild(overlay);
+
+    const close = () => { sidebar.classList.remove("open"); overlay.classList.remove("show"); };
+    const toggle = () => {
+      const open = sidebar.classList.toggle("open");
+      overlay.classList.toggle("show", open);
+    };
+    btn.addEventListener("click", toggle);
+    overlay.addEventListener("click", close);
+    // tapping a category/link inside the drawer closes it (portrait + mobile)
+    sidebar.addEventListener("click", (e) => {
+      if (e.target.closest(".nav-cat-head, .nav-link, a")) close();
+    });
   }
 
   /* ---------- shared namespace ---------- */
